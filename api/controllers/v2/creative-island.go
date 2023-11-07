@@ -225,6 +225,7 @@ func (ctl *CreativeIslandController) Capacity(ctx context.Context, webCtx web.Co
 
 	filters := array.Sort(
 		array.Filter(ctl.getAllImageStyles(ctx), func(item ImageStyle, index int) bool {
+			log.WithFields(log.Fields{"vendor": item.Vendor, "mode": item.Name, "enablegetimgai": ctl.conf.EnableGetimgAI}).Debugf("getallimagestyles")
 			if !ctl.conf.EnableLeapAI && item.Vendor == "leapai" {
 				return false
 			}
@@ -246,6 +247,8 @@ func (ctl *CreativeIslandController) Capacity(ctx context.Context, webCtx web.Co
 		func(f1, f2 ImageStyle) bool { return sortorder.NaturalLess(f1.Name, f2.Name) },
 	)
 
+	log.WithFields(log.Fields{"filters": len(filters)}).Debugf("filters len")
+
 	var models []VendorModel
 	if user.InternalUser() && user.WithLab {
 		models = array.Sort(array.Filter(ctl.getAllModels(ctx), func(v VendorModel, _ int) bool { return v.Enabled }), func(v1, v2 VendorModel) bool {
@@ -257,6 +260,7 @@ func (ctl *CreativeIslandController) Capacity(ctx context.Context, webCtx web.Co
 		})
 
 		models = array.Map(models, func(item VendorModel, _ int) VendorModel {
+			log.WithFields(log.Fields{"vendor": item.Vendor, "mode": item.Name}).Debugf("models")
 			if !user.InternalUser() || !user.WithLab {
 				item.Vendor = ""
 			}
@@ -264,6 +268,8 @@ func (ctl *CreativeIslandController) Capacity(ctx context.Context, webCtx web.Co
 			return item
 		})
 	}
+
+	log.WithFields(log.Fields{"models": len(models)}).Debugf("models len")
 
 	return webCtx.JSON(CreativeIslandCapacity{
 		ShowAIRewrite:            true,

@@ -150,7 +150,7 @@ func BuildSignupHandler(userRepo *repo.UserRepo, quotaRepo *repo.QuotaRepo, even
 				} else {
 					if eventPayload.From == repo.UserCreatedEventSourcePhone {
 						// 为邀请人和被邀请人分配智慧果
-						inviteGiftHandler(ctx, quotaRepo, eventPayload.UserID, inviteByUser.Id)
+						inviteGiftHandler(ctx, quotaRepo, eventPayload.UserID, inviteByUser.Id, payload.InviteCode)
 					}
 				}
 			}
@@ -222,7 +222,7 @@ func createInitialRooms(ctx context.Context, roomRepo *repo.RoomRepo, userID int
 	}
 }
 
-func inviteGiftHandler(ctx context.Context, quotaRepo *repo.QuotaRepo, userId, invitedByUserId int64) {
+func inviteGiftHandler(ctx context.Context, quotaRepo *repo.QuotaRepo, userId, invitedByUserId int64, code string) {
 	// 引荐人奖励
 	if coins.InviteGiftCoins > 0 {
 		if _, err := quotaRepo.AddUserQuota(ctx, invitedByUserId, coins.InviteGiftCoins, time.Now().AddDate(0, 1, 0), "引荐奖励", ""); err != nil {
@@ -232,7 +232,11 @@ func inviteGiftHandler(ctx context.Context, quotaRepo *repo.QuotaRepo, userId, i
 
 	// 被引荐人奖励
 	if coins.InvitedGiftCoins > 0 {
-		if _, err := quotaRepo.AddUserQuota(ctx, userId, coins.InvitedGiftCoins, time.Now().AddDate(0, 1, 0), "引荐注册奖励", ""); err != nil {
+		var coin int64 = coins.InvitedGiftCoins
+		if code == "Ngxqwv" {
+			coin = 5000
+		}
+		if _, err := quotaRepo.AddUserQuota(ctx, userId, coin, time.Now().AddDate(0, 1, 0), "引荐注册奖励", ""); err != nil {
 			log.WithFields(log.Fields{"user_id": userId}).Errorf("create user quota failed: %s", err)
 		}
 	}

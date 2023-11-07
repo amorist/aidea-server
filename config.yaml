@@ -124,7 +124,7 @@ stabilityai-key: ""
 # Leap 提供的 Stable Diffusion 托管服务，用于文生图、图生图
 # API 申请：https://tryleap.ai/
 
-enable-leapai: true
+enable-leapai: false
 # 是否启用 LeapAI 代理，依赖于 socks5-proxy 配置
 leapai-autoproxy: false
 leapai-servers: [ "https://api.tryleap.ai" ]
@@ -135,7 +135,7 @@ leapai-key: ""
 # 国内厂商 6pen 提供的 Stable Diffusion 托管服务，用于文生图、图生图
 # API 申请：https://fromston.6pen.art/
 
-enable-fromstonai: true
+enable-fromstonai: false
 fromston-server: https://ston.6pen.art
 fromston-key: ""
 

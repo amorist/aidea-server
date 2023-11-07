@@ -133,7 +133,7 @@ func BuildBindPhoneHandler(userRepo *repo.UserRepo, quotaRepo *repo.QuotaRepo, e
 					log.WithFields(log.Fields{"user_id": eventPayload.UserID, "invited_by": inviteByUser.Id}).Errorf("更新用户邀请信息失败: %s", err)
 				} else {
 					// 为邀请人和被邀请人分配智慧果
-					inviteGiftHandler(ctx, quotaRepo, eventPayload.UserID, inviteByUser.Id)
+					inviteGiftHandler(ctx, quotaRepo, eventPayload.UserID, inviteByUser.Id, payload.InviteCode)
 				}
 			}
 		}

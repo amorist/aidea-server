@@ -199,10 +199,13 @@ func (ctl *PaymentController) QueryPaymentStatus(ctx context.Context, webCtx web
 	paymentId := webCtx.PathVar("id")
 	history, err := ctl.payRepo.GetPaymentHistory(ctx, user.ID, paymentId)
 	if err != nil {
+		log.WithFields(log.Fields{
+			"err": err.Error(),
+		}).Debugf("query payment status")
+		fmt.Println(err)
 		if err == repo.ErrNotFound {
 			return webCtx.JSONError(common.Text(webCtx, ctl.translater, common.ErrNotFound), http.StatusNotFound)
 		}
-
 		return webCtx.JSONError(common.Text(webCtx, ctl.translater, common.ErrInternalError), http.StatusInternalServerError)
 	}
 
@@ -403,7 +406,7 @@ func (ctl *PaymentController) AppleProducts(ctx context.Context, webCtx web.Cont
 		"note": `
 1. 您购买的智慧果需在有效期内使用，逾期未使用即失效；
 2. 智慧果不支持退款、提现或转赠他人；
-3. 支付如遇到问题，可发邮件至 support@aicode.cc，我们会为您解决。
+3. 支付如遇到问题，可发邮件至 amor@dgshare.com，我们会为您解决。
 		`,
 	})
 }
