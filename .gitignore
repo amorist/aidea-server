@@ -5,3 +5,5 @@ Makefile.local
 .vscode/
 .idea/
 *.log
+config_prd.yaml
+.DS_Store

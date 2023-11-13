@@ -423,7 +423,7 @@ func (ctl *UserController) CurrentUser(ctx context.Context, webCtx web.Context, 
 		"control": web.M{
 			"is_set_pwd":         user.IsSetPassword,
 			"enable_invite":      user.InviteCode != "",
-			"invite_message":     fmt.Sprintf("【AIdea】玩转 GPT，实在太有趣啦！\n\n用我的专属邀请码 %s 注册，不仅免费用，还有额外奖励！\n\n快去下载 aidea.aicode.cc ，我在未来世界等你！", user.InviteCode),
+			"invite_message":     fmt.Sprintf("【云数享AI】玩转 AI，实在太有趣啦！\n\n用我的专属邀请码 %s 注册，不仅免费用，还有额外奖励！\n\n快去下载，我在未来世界等你！", user.InviteCode),
 			"user_card_bg":       "https://ssl.aicode.cc/ai-server/assets/quota-card-bg.webp-thumb1000",
 			"invite_card_bg":     "https://ssl.aicode.cc/ai-server/assets/invite-card-bg.webp-thumb1000",
 			"invite_card_color":  "FF000000",

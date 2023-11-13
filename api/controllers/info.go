@@ -56,13 +56,13 @@ var qrCodes = []string{
 func (ctl *InfoController) shareInfo(ctx web.Context, user *auth.UserOptional) web.Response {
 	var res = web.M{
 		"qr_code": qrCodes[rand.Intn(len(qrCodes))],
-		"message": "扫码下载 AIdea，玩转 GPT，实在太有趣啦！",
+		"message": "扫码下载 云数享AI，玩转 AI，实在太有趣啦！",
 	}
 
 	if user.User != nil {
 		if user.User.InviteCode != "" {
 			res["invite_code"] = user.User.InviteCode
-			res["message"] = fmt.Sprintf("扫码下载 AIdea，用我的专属邀请码 %s 注册，不仅免费用，还有额外奖励！", user.User.InviteCode)
+			res["message"] = fmt.Sprintf("扫码下载 云数享AI，用我的专属邀请码 %s 注册，不仅免费用，还有额外奖励！", user.User.InviteCode)
 		}
 	}
 
@@ -84,7 +84,7 @@ func (ctl *InfoController) VersionCheck(ctx web.Context) web.Response {
 		"has_update":     hasUpdate,
 		"server_version": CurrentVersion,
 		"force_update":   false,
-		"url":            "https://aidea.aicode.cc",
+		"url":            "",
 		"message":        fmt.Sprintf("新版本 %s 发布啦，赶快去更新吧！", CurrentVersion),
 	})
 }

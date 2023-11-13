@@ -20,4 +20,7 @@ orm:
 	eloquent gen --source 'internal/repo/model/*.yaml'
 	gofmt -s -w internal/repo/model/*.go
 
+scp:
+	scp build/release/aidea-server-linux root@106.15.32.100:/var/www/aidea-server
+
 .PHONY: build build-release orm build-linux
