@@ -150,7 +150,7 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 				} else {
 					if eventPayload.From == repo.UserCreatedEventSourcePhone {
 						// 为邀请人和被邀请人分配智慧果
-						inviteGiftHandler(ctx, quotaRepo, eventPayload.UserID, inviteByUser.Id, payload.InviteCode)
+						inviteGiftHandler(ctx, rep.Quota, eventPayload.UserID, inviteByUser.Id, payload.InviteCode)
 					}
 				}
 			}
@@ -232,7 +232,7 @@ func inviteGiftHandler(ctx context.Context, quotaRepo *repo.QuotaRepo, userId, i
 
 	// 被引荐人奖励
 	if coins.InvitedGiftCoins > 0 {
-		var coin int64 = coins.InvitedGiftCoins
+		var coin int64 = int64(coins.InvitedGiftCoins)
 		if code == "Ngxqwv" {
 			coin = 5000
 		}
