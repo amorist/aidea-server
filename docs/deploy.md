@@ -1,5 +1,7 @@
 # 部署指南
 
+> 建议大家尽可能的自己去部署，遇到问题在 [GitHub Issues](https://github.com/mylxsw/aidea-server/issues) 提出，如果实在懒得搞，可以找我来帮你部署，详情参考 [服务器代部署说明](./deploy-vip.md)。
+> 
 > 由于时间仓促，文档可能尚未详尽，我将在后续逐步补充详细的说明文档。
 
 ## 架构草图
@@ -33,7 +35,7 @@
     - 腾讯云短信服务
 - 内容安全检测（使用阿里云的内容安全服务，用于检测提示语中是否包含敏感词汇）
 - 有道翻译 API 接口（翻译功能、文生图及图生图提示语中文转英文）
-- 百度文心千帆大模型 Keys，支持以下模型
+- 百度文心千帆大模型 Keys，支持以下模型 【[开通指南](https://github.com/mylxsw/aidea-server/wiki/百度文心千帆服务开通指南)】
     - model_ernie_bot_turbo
     - model_ernie_bot
 - 阿里灵积平台模型 Keys，支持以下模型
@@ -104,9 +106,4 @@ mysql> SOURCE /Users/mylxsw/Workspace/codes/ai/ai-server/migrate/2023092501-dml.
     ```
 5. 我不想自己安装，能否帮我部署一套？
     
-    建议大家尽可能的自己去部署，遇到问题在 [GitHub Issues](https://github.com/mylxsw/aidea-server/issues) 提出，如果实在懒得搞，可以找我来帮你部署，但是需要收费，费用暂定为 2000 RMB/次（不含在线支付功能，支付功能配置请 [参考文档](./alipay-configuration.md) 自行配置），如果有需要可以联系我，微信号：mylxsw。你需要自己准备以下资源
-    - 应用服务器（建议内存 1G 以上）
-    - MySQL 8.0+ 
-    - Redis 7.0+
-    - [项目依赖](#项目依赖) 中提到的第三方服务，我可以告诉你怎么去申请，因为涉及到给第三方服务付款以及实名认证等问题，还是要你自己去申请。
-   
+    建议大家尽可能的自己去部署，遇到问题在 [GitHub Issues](https://github.com/mylxsw/aidea-server/issues) 提出，如果实在懒得搞，可以找我来帮你部署，详情参考 [服务器代部署说明](./deploy-vip.md)。
