@@ -5,12 +5,19 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/mylxsw/aidea-server/internal/helper"
-	"github.com/mylxsw/asteria/log"
-	"gopkg.in/resty.v1"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
+	"time"
+
+	"github.com/hashicorp/go-uuid"
+	"github.com/mylxsw/aidea-server/internal/helper"
+	"github.com/mylxsw/aidea-server/internal/uploader"
+	"github.com/mylxsw/asteria/log"
+	"github.com/mylxsw/go-utils/must"
+	"gopkg.in/resty.v1"
 )
 
 type BaiduImageAI struct {
@@ -289,4 +296,101 @@ func (ai *BaiduImageAI) QualityEnhance(ctx context.Context, req SimpleImageReque
 	}
 
 	return &ret, nil
+}
+
+// Text2ImageRequest .
+type Text2ImageRequest struct {
+	Prompt         string `json:"prompt,omitempty"`
+	NegativePrompt string `json:"negative_prompt,omitempty"`
+	Size           string `json:"size,omitempty"`
+	N              int    `json:"n,omitempty"`
+	Steps          int    `json:"steps,omitempty"`
+	SamplerIndex   string `json:"sampler_index,omitempty"`
+	UserID         string `json:"user_id,omitempty"`
+}
+
+// Text2ImageResponse .
+type Text2ImageResponse struct {
+	ID     string `json:"id,omitempty"`
+	Object string `json:"object,omitempty"`
+	// Created int64  `json:"created,omitempty"`
+	Data  []ImageData `json:"data,omitempty"`
+	Usage struct {
+		PromptTokens int `json:"prompt_tokens,omitempty"`
+		TotalTokens  int `json:"total_tokens,omitempty"`
+	} `json:"usage,omitempty"`
+}
+
+// ImageData .
+type ImageData struct {
+	Object   string `json:"object,omitempty"`
+	B64Image string `json:"b64_image,omitempty"`
+	Index    int    `json:"index,omitempty"`
+}
+
+// Text2Image .
+func (ai *BaiduImageAI) Text2Image(ctx context.Context, req Text2ImageRequest) (*Text2ImageResponse, error) {
+	resp, err := helper.RestyClient(2).
+		SetTimeout(1*time.Hour).
+		R().
+		SetBody(req).
+		SetQueryParam("access_token", ai.getAccessToken()).
+		SetContext(ctx).
+		Post("https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/text2image/sd_xl")
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("request failed: %v", err)
+	}
+
+	if resp.IsError() {
+		fmt.Println(resp.Body())
+		return nil, fmt.Errorf("request failed: %s", string(resp.Body()))
+	}
+
+	var ret Text2ImageResponse
+	if err := json.Unmarshal(resp.Body(), &ret); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal response body: %v", err)
+	}
+
+	return &ret, nil
+}
+
+// SaveToLocalFiles .
+func (resp *Text2ImageResponse) SaveToLocalFiles(ctx context.Context, savePath string) ([]string, error) {
+	var resources []string
+	for _, img := range resp.Data {
+		data, err := base64.StdEncoding.DecodeString(img.B64Image)
+		if err != nil {
+			return nil, fmt.Errorf("decode base64 failed: %w", err)
+		}
+
+		key := filepath.Join(savePath, fmt.Sprintf("%s.%s", must.Must(uuid.GenerateUUID()), "png"))
+		if err := os.WriteFile(key, data, os.ModePerm); err != nil {
+			return nil, fmt.Errorf("write image to file failed: %w", err)
+		}
+
+		resources = append(resources, key)
+	}
+
+	return resources, nil
+}
+
+// UploadResources .
+func (resp *Text2ImageResponse) UploadResources(ctx context.Context, up *uploader.Uploader, uid int64) ([]string, error) {
+	var resources []string
+	for _, img := range resp.Data {
+		data, err := base64.StdEncoding.DecodeString(img.B64Image)
+		if err != nil {
+			return nil, fmt.Errorf("decode base64 failed: %w", err)
+		}
+
+		ret, err := up.UploadStream(ctx, int(uid), uploader.DefaultUploadExpireAfterDays, data, "png")
+		if err != nil {
+			return nil, fmt.Errorf("upload image to qiniu failed: %w", err)
+		}
+
+		resources = append(resources, ret)
+	}
+
+	return resources, nil
 }

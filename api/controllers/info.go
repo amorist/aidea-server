@@ -45,24 +45,19 @@ func (ctl *InfoController) Register(router web.Router) {
 }
 
 var qrCodes = []string{
-	"https://ssl.aicode.cc/ai-server/assets/%E4%BA%8C%E7%BB%B4%E7%A0%81.png",
-	"https://ssl.aicode.cc/ai-server/assets/qr-1.png",
-	"https://ssl.aicode.cc/ai-server/assets/qr-3.png",
-	"https://ssl.aicode.cc/ai-server/assets/qr-4.png",
-	"https://ssl.aicode.cc/ai-server/assets/qr-5.png",
-	"https://ssl.aicode.cc/ai-server/assets/qr-6.png",
+	"https://kdplatform.oss-cn-shanghai.aliyuncs.com/brief/qrcode.png",
 }
 
 func (ctl *InfoController) shareInfo(ctx web.Context, user *auth.UserOptional) web.Response {
 	var res = web.M{
 		"qr_code": qrCodes[rand.Intn(len(qrCodes))],
-		"message": "扫码下载 云数享AI，玩转 AI，实在太有趣啦！",
+		"message": "扫码注册 下需求，玩转 AI，实在太有趣啦！",
 	}
 
 	if user.User != nil {
 		if user.User.InviteCode != "" {
 			res["invite_code"] = user.User.InviteCode
-			res["message"] = fmt.Sprintf("扫码下载 云数享AI，用我的专属邀请码 %s 注册，不仅免费用，还有额外奖励！", user.User.InviteCode)
+			res["message"] = fmt.Sprintf("扫码注册 下需求，用我的专属邀请码 %s 注册，不仅免费用，还有额外奖励！", user.User.InviteCode)
 		}
 	}
 

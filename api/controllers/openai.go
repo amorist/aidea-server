@@ -5,16 +5,19 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/websocket"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/go-redis/redis_rate/v10"
 	"github.com/mylxsw/aidea-server/internal/rate"
+	"github.com/mylxsw/aidea-server/internal/uploader"
 
+	"github.com/mylxsw/aidea-server/internal/ai/baidu"
 	"github.com/mylxsw/aidea-server/internal/ai/chat"
 
 	"github.com/mylxsw/aidea-server/api/auth"
@@ -35,11 +38,13 @@ import (
 
 // OpenAIController OpenAI 控制器
 type OpenAIController struct {
-	conf        *config.Config
-	chat        chat.Chat                `autowire:"@"`
-	client      *openaiHelper.OpenAI     `autowire:"@"`
-	translater  youdao.Translater        `autowire:"@"`
-	tencent     *tencent.Tencent         `autowire:"@"`
+	conf       *config.Config
+	chat       chat.Chat            `autowire:"@"`
+	client     *openaiHelper.OpenAI `autowire:"@"`
+	translater youdao.Translater    `autowire:"@"`
+	tencent    *tencent.Tencent     `autowire:"@"`
+	uploader   *uploader.Uploader   `autowire:"@"`
+	// baidu       *baidu.BaiduImageAI      `autowire:"@"`
 	messageRepo *repo.MessageRepo        `autowire:"@"`
 	securitySrv *service.SecurityService `autowire:"@"`
 	userSrv     *service.UserService     `autowire:"@"`
@@ -155,10 +160,11 @@ func (ctl *OpenAIController) audioTranscriptions(ctx context.Context, webCtx web
 //})
 
 type FinalMessage struct {
-	QuotaConsumed int64 `json:"quota_consumed,omitempty"`
-	Token         int64 `json:"token,omitempty"`
-	QuestionID    int64 `json:"question_id,omitempty"`
-	AnswerID      int64 `json:"answer_id,omitempty"`
+	QuotaConsumed int64  `json:"quota_consumed,omitempty"`
+	Token         int64  `json:"token,omitempty"`
+	QuestionID    int64  `json:"question_id,omitempty"`
+	AnswerID      int64  `json:"answer_id,omitempty"`
+	Image         string `json:"image,omitempty"`
 }
 
 func (m FinalMessage) ToJSON() string {
@@ -238,6 +244,8 @@ func (ctl *OpenAIController) Chat(ctx context.Context, webCtx web.Context, user 
 		}
 	}
 
+	req.RoomID = int64(req.N)
+
 	// 查询 room 信息，修正最大上下文消息数量
 	var maxContextLength int64 = 5
 	if req.RoomID > 0 {
@@ -249,6 +257,8 @@ func (ctl *OpenAIController) Chat(ctx context.Context, webCtx web.Context, user 
 			if err != nil {
 				log.With(req).Errorf("get room info failed: %s", err)
 			}
+
+			fmt.Println(room.Name)
 
 			if room.MaxContext > 0 {
 				maxContextLength = room.MaxContext
@@ -415,7 +425,7 @@ func (ctl *OpenAIController) Chat(ctx context.Context, webCtx web.Context, user 
 			log.F(log.M{"req": req, "user": user}).Errorf("聊天失败：%s", chatErrorMessage)
 		}
 
-		ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 		defer cancel()
 
 		var answerID int64
@@ -438,7 +448,52 @@ func (ctl *OpenAIController) Chat(ctx context.Context, webCtx web.Context, user 
 			}
 		}
 
-		finalMsg := FinalMessage{QuestionID: questionID, AnswerID: answerID}
+		var imageText string
+
+		if req.RoomID == 1014 {
+			// 拼接提示词
+			// prompt := "我正在使用一个叫做Midjourney的AI图像生成工具。我想让你充当关键词生成器。你会生成各种关键词。例如，如果我输入'跑车图像'，你将生成关键词，如'Realistic true details photography of Sports car,laction shots, speed motion blur, racing tracks, urban environments, scenic roads, dramatic skies',我的主题是："
+			// prompt = fmt.Sprintf("%s\n\n%s", prompt, replyText)
+			// resp := openai.ChatCompletionRequest{
+			// 	Model: req.Model,
+			// 	Messages: []openai.ChatCompletionMessage{
+			// 		{
+			// 			Role:    "user",
+			// 			Content: prompt,
+			// 		},
+			// 	},
+			// }
+			// fmt.Println(resp.Messages[0].Content, 12341234)
+			// 绘制图片 baidu image Text2Image
+			client := baidu.NewBaiduImageAI(ctl.conf.BaiduWXKey, ctl.conf.BaiduWXSecret)
+
+			text2ImageRes, err := client.Text2Image(ctx, baidu.Text2ImageRequest{
+				Prompt:         "A cat, exquisite eyes, expressive face, (mechanical armor), one piece mech, mechanical sports shoes, futuristic, by the lake, combat posture, sunset, forest, (Tindall light), high-quality, realistic, realistic shadows, art photography, Nikon D850, 16K, clear focus,,<lora:TravelingCatXL:0.7>",
+				NegativePrompt: "(deformed, distorted, disfigured, doll:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation, 3d, illustration, cartoon, fcNeg-neg",
+				Size:           "768x768",
+				Steps:          35,
+				SamplerIndex:   "DPM++ SDE Karras",
+				N:              1,
+				UserID:         fmt.Sprint(user.ID),
+			})
+			if err != nil {
+				fmt.Println(err)
+				log.With(req).Errorf("text2image error: %v", err)
+			}
+			if text2ImageRes != nil && len(text2ImageRes.Data) > 0 {
+				images, err := text2ImageRes.UploadResources(ctx, ctl.uploader, user.ID)
+				if err != nil {
+					fmt.Println(err)
+					log.With(req).Errorf("upload image error: %v", err)
+				}
+				if len(images) > 0 {
+					imageText = images[0]
+				}
+			}
+		}
+
+		finalMsg := FinalMessage{QuestionID: questionID, AnswerID: answerID, Image: imageText}
+
 		if user.InternalUser() {
 			finalMsg.QuotaConsumed = quotaConsumed
 			finalMsg.Token = int64(realWordCount)

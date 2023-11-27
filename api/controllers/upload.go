@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 
+	qiniuAuth "github.com/qiniu/go-sdk/v7/auth"
+
 	"github.com/mylxsw/aidea-server/api/auth"
 	"github.com/mylxsw/aidea-server/api/controllers/common"
 	"github.com/mylxsw/aidea-server/config"
@@ -84,6 +86,12 @@ func (ctl *UploadController) uploadInit(ctx context.Context, webCtx web.Context,
 
 // uploadCallback 文件上传回调（七牛云发起）
 func (ctl *UploadController) uploadCallback(ctx context.Context, webCtx web.Context, quotaRepo *repo.QuotaRepo) web.Response {
+	// 验证请求来源为七牛云
+	mac := qiniuAuth.New(ctl.conf.StorageAppKey, ctl.conf.StorageAppSecret)
+	if ok, err := mac.VerifyCallback(webCtx.Request().Raw()); err != nil || !ok {
+		return webCtx.JSONError(common.Text(webCtx, ctl.translater, "invalid callback"), http.StatusBadRequest)
+	}
+
 	var cb UploadCallback
 	if err := webCtx.Unmarshal(&cb); err != nil {
 		return webCtx.JSONError(common.Text(webCtx, ctl.translater, err.Error()), http.StatusBadRequest)
