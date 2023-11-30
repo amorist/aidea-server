@@ -3,9 +3,10 @@ package baidu_test
 import (
 	"context"
 	"fmt"
-	"github.com/mylxsw/aidea-server/pkg/ai/baidu"
 	"os"
 	"testing"
+
+	"github.com/mylxsw/aidea-server/pkg/ai/baidu"
 
 	"github.com/mylxsw/asteria/log"
 	"github.com/mylxsw/go-utils/assert"
