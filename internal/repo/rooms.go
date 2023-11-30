@@ -5,8 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/mylxsw/go-utils/maps"
 	"time"
+
+	"github.com/mylxsw/go-utils/maps"
 
 	"github.com/mylxsw/asteria/log"
 
@@ -45,6 +46,7 @@ type Room struct {
 }
 
 func (r *RoomRepo) Rooms(ctx context.Context, userID int64, roomTypes []int, limit int64) ([]Room, error) {
+	r.InitRooms(ctx, userID)
 	q := query.Builder().
 		Where(model.FieldRoomsUserId, userID).
 		WhereIn(model.FieldRoomsRoomType, roomTypes).
@@ -189,6 +191,60 @@ func (r *RoomRepo) UpdateLastActiveTime(ctx context.Context, userID, roomID int6
 	})
 
 	return err
+}
+
+func (r *RoomRepo) InitRooms(ctx context.Context, userID int64) (err error) {
+	roomQ := query.Builder().
+		Where(model.FieldRoomsUserId, userID)
+	exist, err := model.NewRoomsModel(r.db).Exists(ctx, roomQ)
+	if err != nil {
+		return err
+	}
+	if exist {
+		return nil
+	}
+	roomIDs := []int64{35, 36, 37, 38}
+	rooms, err := model.NewRoomGalleryModel(r.db).Get(ctx, query.Builder().WhereIn(model.FieldRoomsId, roomIDs))
+	if err != nil {
+		return err
+	}
+	for _, item := range rooms {
+		room := &model.Rooms{
+			Name:           item.Name.String,
+			UserId:         userID,
+			Model:          item.Model.String,
+			Vendor:         item.Vendor.String,
+			SystemPrompt:   item.Prompt.String,
+			MaxContext:     item.MaxContext.Int64,
+			RoomType:       1,
+			InitMessage:    item.InitMessage.String,
+			AvatarId:       item.AvatarId.Int64,
+			AvatarUrl:      item.AvatarUrl.String,
+			LastActiveTime: time.Now(),
+		}
+
+		roomN := room.ToRoomsN(
+			model.FieldRoomsName,
+			model.FieldRoomsUserId,
+			model.FieldRoomsAvatarId,
+			model.FieldRoomsAvatarUrl,
+			model.FieldRoomsDescription,
+			model.FieldRoomsPriority,
+			model.FieldRoomsModel,
+			model.FieldRoomsVendor,
+			model.FieldRoomsSystemPrompt,
+			model.FieldRoomsLastActiveTime,
+			model.FieldRoomsMaxContext,
+			model.FieldRoomsRoomType,
+			model.FieldRoomsInitMessage,
+		)
+
+		_, err = model.NewRoomsModel(r.db).Save(ctx, roomN)
+		if err != nil {
+			return err
+		}
+	}
+	return
 }
 
 type GalleryRoom struct {
