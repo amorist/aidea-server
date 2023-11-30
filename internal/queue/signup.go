@@ -3,14 +3,17 @@ package queue
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
+
+	"github.com/mylxsw/aidea-server/pkg/dingding"
+	"github.com/mylxsw/aidea-server/pkg/mail"
+	"github.com/mylxsw/aidea-server/pkg/repo"
+	repo2 "github.com/mylxsw/aidea-server/pkg/repo"
+	"github.com/mylxsw/aidea-server/pkg/repo/model"
 
 	"github.com/hibiken/asynq"
 	"github.com/mylxsw/aidea-server/internal/coins"
-	"github.com/mylxsw/aidea-server/internal/dingding"
-	"github.com/mylxsw/aidea-server/internal/mail"
-	"github.com/mylxsw/aidea-server/internal/repo"
-	"github.com/mylxsw/aidea-server/internal/repo/model"
 	"github.com/mylxsw/asteria/log"
 )
 
@@ -53,7 +56,7 @@ func NewSignupTask(payload any) *asynq.Task {
 	return asynq.NewTask(TypeSignup, data)
 }
 
-func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingding.Dingding) TaskHandler {
+func BuildSignupHandler(rep *repo2.Repository, mailer *mail.Sender, ding *dingding.Dingding) TaskHandler {
 	return func(ctx context.Context, task *asynq.Task) (err error) {
 		var payload SignupPayload
 		if err := json.Unmarshal(task.Payload(), &payload); err != nil {
@@ -75,7 +78,7 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 				if err := rep.Queue.Update(
 					context.TODO(),
 					payload.GetID(),
-					repo.QueueTaskStatusFailed,
+					repo2.QueueTaskStatusFailed,
 					ErrorResult{
 						Errors: []string{err.Error()},
 					},
@@ -83,7 +86,7 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 					log.With(task).Errorf("update queue status failed: %s", err)
 				}
 
-				if err := rep.Event.UpdateEvent(ctx, payload.EventID, repo.EventStatusFailed); err != nil {
+				if err := rep.Event.UpdateEvent(ctx, payload.EventID, repo2.EventStatusFailed); err != nil {
 					log.WithFields(log.Fields{"event_id": payload.EventID}).Errorf("update event status failed: %s", err)
 				}
 			}
@@ -92,7 +95,7 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 		// 查询事件记录
 		event, err := rep.Event.GetEvent(ctx, payload.EventID)
 		if err != nil {
-			if err == repo.ErrNotFound {
+			if err == repo2.ErrNotFound {
 				log.WithFields(log.Fields{"event_id": payload.EventID}).Errorf("event not found")
 				return nil
 			}
@@ -101,17 +104,17 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 			return err
 		}
 
-		if event.Status != repo.EventStatusWaiting {
+		if event.Status != repo2.EventStatusWaiting {
 			log.WithFields(log.Fields{"event_id": payload.EventID}).Warningf("event status is not waiting")
 			return nil
 		}
 
-		if event.EventType != repo.EventTypeUserCreated {
+		if event.EventType != repo2.EventTypeUserCreated {
 			log.With(payload).Errorf("event type is not user_created")
 			return nil
 		}
 
-		var eventPayload repo.UserCreatedEvent
+		var eventPayload repo2.UserCreatedEvent
 		if err := json.Unmarshal([]byte(event.Payload), &eventPayload); err != nil {
 			log.With(payload).Errorf("unmarshal event payload failed: %s", err)
 			return err
@@ -120,13 +123,13 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 		// 为用户分配默认配额
 		// 1. 如果是邮箱注册，不赠送智慧果，只有在用户绑定手机后才赠送
 		// 2. 如果是手机注册，直接赠送智慧果
-		if eventPayload.From == repo.UserCreatedEventSourceEmail {
+		if eventPayload.From == repo2.UserCreatedEventSourceEmail {
 			if coins.SignupGiftCoins > 0 {
 				if _, err := rep.Quota.AddUserQuota(ctx, eventPayload.UserID, int64(coins.SignupGiftCoins), time.Now().AddDate(0, 1, 0), "新用户注册赠送", ""); err != nil {
 					log.WithFields(log.Fields{"user_id": eventPayload.UserID}).Errorf("create user quota failed: %s", err)
 				}
 			}
-		} else if eventPayload.From == repo.UserCreatedEventSourcePhone {
+		} else if eventPayload.From == repo2.UserCreatedEventSourcePhone {
 			if _, err := rep.Quota.AddUserQuota(ctx, eventPayload.UserID, int64(coins.BindPhoneGiftCoins), time.Now().AddDate(0, 1, 0), "新用户注册赠送", ""); err != nil {
 				log.WithFields(log.Fields{"user_id": eventPayload.UserID}).Errorf("create user quota failed: %s", err)
 			}
@@ -141,17 +144,15 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 		if payload.InviteCode != "" {
 			inviteByUser, err := rep.User.GetUserByInviteCode(ctx, payload.InviteCode)
 			if err != nil {
-				if err != repo.ErrNotFound {
+				if !errors.Is(err, repo2.ErrNotFound) {
 					log.With(payload).Errorf("通过邀请码查询用户失败: %s", err)
 				}
 			} else {
 				if err := rep.User.UpdateUserInviteBy(ctx, eventPayload.UserID, inviteByUser.Id); err != nil {
 					log.WithFields(log.Fields{"user_id": eventPayload.UserID, "invited_by": inviteByUser.Id}).Errorf("更新用户邀请信息失败: %s", err)
 				} else {
-					if eventPayload.From == repo.UserCreatedEventSourcePhone {
-						// 为邀请人和被邀请人分配智慧果
-						inviteGiftHandler(ctx, rep.Quota, eventPayload.UserID, inviteByUser.Id, payload.InviteCode)
-					}
+					// 为邀请人和被邀请人分配智慧果
+					inviteGiftHandler(ctx, rep.Quota, eventPayload.UserID, inviteByUser.Id)
 				}
 			}
 		}
@@ -160,7 +161,7 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 		//createInitialRooms(ctx, roomRepo, eventPayload.UserID)
 
 		// 更新事件状态
-		if err := rep.Event.UpdateEvent(ctx, payload.EventID, repo.EventStatusSucceed); err != nil {
+		if err := rep.Event.UpdateEvent(ctx, payload.EventID, repo2.EventStatusSucceed); err != nil {
 			log.WithFields(log.Fields{"event_id": payload.EventID}).Errorf("update event status failed: %s", err)
 		}
 
@@ -179,7 +180,7 @@ func BuildSignupHandler(rep *repo.Repository, mailer *mail.Sender, ding *dingdin
 		return rep.Queue.Update(
 			context.TODO(),
 			payload.GetID(),
-			repo.QueueTaskStatusSuccess,
+			repo2.QueueTaskStatusSuccess,
 			EmptyResult{},
 		)
 	}
@@ -194,7 +195,7 @@ type InitRoom struct {
 }
 
 // 为用户创建默认的数字人
-func createInitialRooms(ctx context.Context, roomRepo *repo.RoomRepo, userID int64) {
+func createInitialRooms(ctx context.Context, roomRepo *repo2.RoomRepo, userID int64) {
 	items, err := roomRepo.Galleries(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{"user_id": userID}).Errorf("获取数字人列表失败: %s", err)
@@ -208,7 +209,7 @@ func createInitialRooms(ctx context.Context, roomRepo *repo.RoomRepo, userID int
 			Vendor:         item.Vendor,
 			SystemPrompt:   item.Prompt,
 			MaxContext:     item.MaxContext,
-			RoomType:       repo.RoomTypePreset,
+			RoomType:       repo2.RoomTypePreset,
 			InitMessage:    item.InitMessage,
 			AvatarId:       item.AvatarId,
 			AvatarUrl:      item.AvatarUrl,
