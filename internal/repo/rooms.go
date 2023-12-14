@@ -193,6 +193,7 @@ func (r *RoomRepo) UpdateLastActiveTime(ctx context.Context, userID, roomID int6
 	return err
 }
 
+// InitRooms .
 func (r *RoomRepo) InitRooms(ctx context.Context, userID int64) (err error) {
 	roomQ := query.Builder().
 		Where(model.FieldRoomsUserId, userID)
@@ -203,7 +204,7 @@ func (r *RoomRepo) InitRooms(ctx context.Context, userID int64) (err error) {
 	if exist {
 		return nil
 	}
-	roomIDs := []int64{35, 36, 37, 38}
+	roomIDs := []int64{34, 35, 36, 37, 38}
 	rooms, err := model.NewRoomGalleryModel(r.db).Get(ctx, query.Builder().WhereIn(model.FieldRoomsId, roomIDs))
 	if err != nil {
 		return err

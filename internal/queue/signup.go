@@ -236,6 +236,9 @@ func inviteGiftHandler(ctx context.Context, quotaRepo *repo.QuotaRepo, userId, i
 		if code == "Ngxqwv" {
 			coin = 5000
 		}
+		if code == "disney" {
+			coin = 10000
+		}
 		if _, err := quotaRepo.AddUserQuota(ctx, userId, coin, time.Now().AddDate(0, 1, 0), "引荐注册奖励", ""); err != nil {
 			log.WithFields(log.Fields{"user_id": userId}).Errorf("create user quota failed: %s", err)
 		}
